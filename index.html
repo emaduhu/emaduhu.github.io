@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Exhibitor Map</title>
+    <title>Exhibitor Map with Directions</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -20,13 +21,16 @@
         #search {
             padding: 1rem;
         }
+
         #search input {
             width: 100%;
             padding: 10px;
             font-size: 16px;
+            box-sizing: border-box;
         }
+
         #results {
-            padding: 1rem;
+            padding: 0 1rem 1rem;
         }
         #results div {
             padding: 10px;
@@ -36,10 +40,11 @@
             cursor: pointer;
         }
         #map {
-            height: 400px;
+            height: 80vh; /* Increased from 400px */
             width: 100%;
         }
     </style>
+
 </head>
 <body>
 
@@ -56,24 +61,53 @@
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.min.js"></script>
+
 <script>
+    let currentExhibitorMarker = null; // Add this line at the top of your <script>
     const exhibitors = [
-        { name: "Company A", location: "Hall A - Booth 12", coordinates: [-6.7924, 39.2083] },
-        { name: "Company B", location: "Hall B - Booth 5", coordinates: [-6.7921, 39.2079] },
-        { name: "Company C", location: "Hall C - Booth 8", coordinates: [-6.7930, 39.2085] },
+        { name: "NSSF", location: "Hall A - Booth 12", coordinates: [-6.86385439940719, 39.27817737235835] },
+        { name: "NHIF Tanzania Pavilion", location: "Hall B - Booth 5", coordinates: [-6.864062112222577, 39.27805667295459] },
+        { name: "Bakhresa", location: "Hall C - Booth 8", coordinates: [-6.864086079080057, 39.27857702149526] },
     ];
 
     const resultsContainer = document.getElementById('results');
     const searchInput = document.getElementById('searchInput');
 
-    let map = L.map('map').setView([-6.7924, 39.2083], 18);
+    let userLocation = null;
+    let userMarker = null;
+    let routingControl = null;
+
+    const map = L.map('map').setView([-6.8640, 39.2782], 18);
+
+    // Add OpenStreetMap tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: 'Map data © OpenStreetMap contributors'
     }).addTo(map);
 
+    // Try to get user's location
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                userLocation = [position.coords.latitude, position.coords.longitude];
+                userMarker = L.marker(userLocation).addTo(map)
+                    .bindPopup("You are here").openPopup();
+                map.setView(userLocation, 18);
+            },
+            error => {
+                console.error("Geolocation error:", error);
+                alert("Location access denied. Directions may not work.");
+            }
+        );
+    } else {
+        alert("Geolocation is not supported by your browser.");
+    }
+
     function showResults(query) {
         resultsContainer.innerHTML = '';
-        const matches = exhibitors.filter(e => e.name.toLowerCase().includes(query.toLowerCase()));
+        const matches = exhibitors.filter(e =>
+            e.name.toLowerCase().includes(query.toLowerCase())
+        );
         matches.forEach(e => {
             const div = document.createElement('div');
             div.textContent = `${e.name} - ${e.location}`;
@@ -82,18 +116,58 @@
         });
     }
 
+
+
     function showOnMap(exhibitor) {
+        // Remove previous route
+        if (routingControl) {
+            routingControl.remove();
+            routingControl = null;
+        }
+
+        // Remove previous exhibitor marker
+        if (currentExhibitorMarker) {
+            map.removeLayer(currentExhibitorMarker);
+            currentExhibitorMarker = null;
+        }
+
+        // Center map on exhibitor location
         map.setView(exhibitor.coordinates, 19);
-        L.marker(exhibitor.coordinates).addTo(map)
+
+        // Add new exhibitor marker
+        currentExhibitorMarker = L.marker(exhibitor.coordinates).addTo(map)
             .bindPopup(`<b>${exhibitor.name}</b><br>${exhibitor.location}`)
             .openPopup();
+
+        // Draw directions from user's location
+        if (userLocation) {
+            routingControl = L.Routing.control({
+                waypoints: [
+                    L.latLng(userLocation),
+                    L.latLng(exhibitor.coordinates)
+                ],
+                lineOptions: {
+                    styles: [{ color: 'teal', weight: 5 }]
+                },
+                router: L.Routing.osrmv1({
+                    serviceUrl: 'https://router.project-osrm.org/route/v1'
+                }),
+                createMarker: () => null,
+                routeWhileDragging: false
+            }).addTo(map);
+        } else {
+            alert("User location not yet available.");
+        }
     }
 
+
+
+    // Handle search input
     searchInput.addEventListener('input', () => {
         showResults(searchInput.value);
     });
 
-    // Show all by default
+    // Show all exhibitors initially
     showResults('');
 </script>
 
