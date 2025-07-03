@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Exhibitor Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background: teal;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+        #search {
+            padding: 1rem;
+        }
+        #search input {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+        }
+        #results {
+            padding: 1rem;
+        }
+        #results div {
+            padding: 10px;
+            margin-bottom: 5px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #map {
+            height: 400px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Find Your Exhibitor</h1>
+</header>
+
+<div id="search">
+    <input type="text" id="searchInput" placeholder="Search exhibitor...">
+</div>
+
+<div id="results"></div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+    const exhibitors = [
+        { name: "Company A", location: "Hall A - Booth 12", coordinates: [-6.7924, 39.2083] },
+        { name: "Company B", location: "Hall B - Booth 5", coordinates: [-6.7921, 39.2079] },
+        { name: "Company C", location: "Hall C - Booth 8", coordinates: [-6.7930, 39.2085] },
+    ];
+
+    const resultsContainer = document.getElementById('results');
+    const searchInput = document.getElementById('searchInput');
+
+    let map = L.map('map').setView([-6.7924, 39.2083], 18);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: 'Map data © OpenStreetMap contributors'
+    }).addTo(map);
+
+    function showResults(query) {
+        resultsContainer.innerHTML = '';
+        const matches = exhibitors.filter(e => e.name.toLowerCase().includes(query.toLowerCase()));
+        matches.forEach(e => {
+            const div = document.createElement('div');
+            div.textContent = `${e.name} - ${e.location}`;
+            div.onclick = () => showOnMap(e);
+            resultsContainer.appendChild(div);
+        });
+    }
+
+    function showOnMap(exhibitor) {
+        map.setView(exhibitor.coordinates, 19);
+        L.marker(exhibitor.coordinates).addTo(map)
+            .bindPopup(`<b>${exhibitor.name}</b><br>${exhibitor.location}`)
+            .openPopup();
+    }
+
+    searchInput.addEventListener('input', () => {
+        showResults(searchInput.value);
+    });
+
+    // Show all by default
+    showResults('');
+</script>
+
+</body>
+</html>
