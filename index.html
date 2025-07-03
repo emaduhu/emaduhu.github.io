@@ -22,6 +22,7 @@
             padding: 1rem;
         }
 
+
         #search input {
             width: 100%;
             padding: 10px;
@@ -40,11 +41,10 @@
             cursor: pointer;
         }
         #map {
-            height: 80vh; /* Increased from 400px */
+            height: 400px;
             width: 100%;
         }
     </style>
-
 </head>
 <body>
 
@@ -64,7 +64,7 @@
 <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.min.js"></script>
 
 <script>
-    let currentExhibitorMarker = null; // Add this line at the top of your <script>
+    let currentExhibitorMarker = null;
     const exhibitors = [
         { name: "NSSF", location: "Hall A - Booth 12", coordinates: [-6.86385439940719, 39.27817737235835] },
         { name: "NHIF Tanzania Pavilion", location: "Hall B - Booth 5", coordinates: [-6.864062112222577, 39.27805667295459] },
@@ -77,6 +77,7 @@
     let userLocation = null;
     let userMarker = null;
     let routingControl = null;
+    let selectedExhibitor = null;
 
     const map = L.map('map').setView([-6.8640, 39.2782], 18);
 
@@ -85,19 +86,31 @@
         attribution: 'Map data © OpenStreetMap contributors'
     }).addTo(map);
 
-    // Try to get user's location
+    // Watch user's location continuously
     if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
+        navigator.geolocation.watchPosition(
             position => {
                 userLocation = [position.coords.latitude, position.coords.longitude];
-                userMarker = L.marker(userLocation).addTo(map)
-                    .bindPopup("You are here").openPopup();
-                map.setView(userLocation, 18);
+
+                // Update or create user marker
+                if (userMarker) {
+                    userMarker.setLatLng(userLocation);
+                } else {
+                    userMarker = L.marker(userLocation).addTo(map)
+                        .bindPopup("You are here").openPopup();
+                    map.setView(userLocation, 18);
+                }
+
+                // Update routing if an exhibitor is selected
+                if (selectedExhibitor) {
+                    updateRouteToExhibitor();
+                }
             },
             error => {
                 console.error("Geolocation error:", error);
                 alert("Location access denied. Directions may not work.");
-            }
+            },
+            { enableHighAccuracy: true, maximumAge: 1000 }
         );
     } else {
         alert("Geolocation is not supported by your browser.");
@@ -116,14 +129,8 @@
         });
     }
 
-
-
     function showOnMap(exhibitor) {
-        // Remove previous route
-        if (routingControl) {
-            routingControl.remove();
-            routingControl = null;
-        }
+        selectedExhibitor = exhibitor;
 
         // Remove previous exhibitor marker
         if (currentExhibitorMarker) {
@@ -139,12 +146,27 @@
             .bindPopup(`<b>${exhibitor.name}</b><br>${exhibitor.location}`)
             .openPopup();
 
-        // Draw directions from user's location
+        // Draw directions if user location is known
         if (userLocation) {
+            updateRouteToExhibitor();
+        } else {
+            alert("User location not yet available.");
+        }
+    }
+
+    function updateRouteToExhibitor() {
+        if (!selectedExhibitor || !userLocation) return;
+
+        if (routingControl) {
+            routingControl.setWaypoints([
+                L.latLng(userLocation),
+                L.latLng(selectedExhibitor.coordinates)
+            ]);
+        } else {
             routingControl = L.Routing.control({
                 waypoints: [
                     L.latLng(userLocation),
-                    L.latLng(exhibitor.coordinates)
+                    L.latLng(selectedExhibitor.coordinates)
                 ],
                 lineOptions: {
                     styles: [{ color: 'teal', weight: 5 }]
@@ -153,14 +175,11 @@
                     serviceUrl: 'https://router.project-osrm.org/route/v1'
                 }),
                 createMarker: () => null,
-                routeWhileDragging: false
+                routeWhileDragging: false,
+                addWaypoints: false
             }).addTo(map);
-        } else {
-            alert("User location not yet available.");
         }
     }
-
-
 
     // Handle search input
     searchInput.addEventListener('input', () => {
@@ -170,6 +189,7 @@
     // Show all exhibitors initially
     showResults('');
 </script>
+
 
 </body>
 </html>
